@@ -4,30 +4,79 @@ from sklearn.metrics.pairwise import euclidean_distances
 
 class TIClustering:
     def __init__(self, threshold):
+        """
+        Initialize the clustering algorithm with a distance threshold.
+        :param threshold: Distance threshold for forming neighborhoods (Eps).
+        """
         self.threshold = threshold
         self.clusters = []
+        self.index = []  # k-Neighborhood index
 
     def fit(self, data):
+        """
+        Fit the clustering algorithm on the data.
+        :param data: Input dataset as a NumPy array.
+        """
+        # Step 1: Choose a global reference point (e.g., origin)
+        reference_point = data[0]  # np.zeros(data.shape[1])
+
+        # Step 2: Compute distances to the reference point and sort the data
+        distances_to_ref = euclidean_distances(data, [reference_point]).flatten()
+        sorted_indices = np.argsort(distances_to_ref)
+        sorted_data = data[sorted_indices]
+
+        # Step 3: Construct k-neighborhood index
+        self.index = self._build_k_neighborhood_index(sorted_data)
+
+        # Step 4: Form clusters using the triangle inequality
         visited = set()
-        for i, point in enumerate(data):
+        for i, point in enumerate(sorted_data):
             if i in visited:
                 continue
 
-            # Find the neighborhood of the current point
-            neighbors = self._find_neighbors(point, data)
+            # Find the neighborhood for the current point
+            neighbors = self.index[i]
 
-            # Check triangle inequality and form a cluster
-            cluster = self._form_cluster(point, neighbors, data)
+            # Form a cluster and mark neighbors as visited
+            cluster = self._form_cluster(point, neighbors, sorted_data)
             self.clusters.append(cluster)
-
-            # Mark all points in the cluster as visited
             visited.update(cluster)
 
+    def _build_k_neighborhood_index(self, data):
+        """
+        Build the k-neighborhood index for the dataset.
+        :param data: Input dataset, sorted by distance to the reference point.
+        :return: List of neighborhoods for each point.
+        """
+        n_points = data.shape[0]
+        index = []
+        for i in range(n_points):
+            neighborhood = self._find_neighbors(data[i], data)
+            index.append(neighborhood)
+        return index
+
     def _find_neighbors(self, point, data):
-        distances = euclidean_distances([point], data)[0]
-        return np.where(distances <= self.threshold)[0]
+        """
+        Find the Eps-neighborhood of a point using the triangle inequality.
+        :param point: The query point.
+        :param data: Sorted dataset.
+        :return: Indices of points within the threshold distance.
+        """
+        distances = euclidean_distances([point], data).flatten()
+        neighbors = []
+        for j, d in enumerate(distances):
+            if d <= self.threshold:
+                neighbors.append(j)
+        return neighbors
 
     def _form_cluster(self, point, neighbors, data):
+        """
+        Form a cluster from the given point and its neighbors.
+        :param point: The query point.
+        :param neighbors: Indices of potential neighbors.
+        :param data: Dataset.
+        :return: Cluster as a set of indices.
+        """
         cluster = set()
         for neighbor in neighbors:
             satisfies_ti = True
@@ -44,57 +93,8 @@ class TIClustering:
         return cluster
 
     def get_clusters(self):
+        """
+        Get the clusters formed by the algorithm.
+        :return: List of clusters, where each cluster is a list of point indices.
+        """
         return [list(cluster) for cluster in self.clusters]
-
-
-# import pandas as pd
-
-# Example usage
-# if __name__ == "__main__":
-# Load the Iris dataset
-# iris = load_iris()
-# data = iris.data  # Features (sepal length, sepal width, petal length, petal width)
-# feature_names = iris.feature_names
-# target_names = iris.target_names
-
-# Initialize the clustering algorithm
-# tic = TIClustering(threshold=2.0)
-
-# # Fit the data
-# tic.fit(data)
-
-# # Output clusters
-# clusters = tic.get_clusters()
-# print("Clusters:", clusters)
-
-# # Create a DataFrame for cluster assignments
-# cluster_assignments = []
-# for i, cluster in enumerate(clusters):
-#     for point in cluster:
-#         cluster_assignments.append([point, i])
-
-# # Convert to DataFrame for easier analysis and display
-# df = pd.DataFrame(cluster_assignments, columns=["Point Index", "Cluster ID"])
-
-# # Display the cluster assignments as a table
-# print("\nCluster Assignments Table:")
-# print(df)
-
-# # Plot the clusters using only the first two features (sepal length and sepal width)
-# plt.figure(figsize=(10, 6))
-
-# # Plot each cluster with different colors
-# for cluster_id, cluster in enumerate(clusters):
-#     cluster_data = data[cluster]
-#     plt.scatter(
-#         cluster_data[:, 0], cluster_data[:, 1], label=f"Cluster {cluster_id}"
-#     )
-
-# # Adding titles and labels
-# plt.title("Triangle Inequality Clustering of Iris Dataset")
-# plt.xlabel("Sepal Length")
-# plt.ylabel("Sepal Width")
-# plt.legend()
-
-# # Show the plot
-# plt.show()

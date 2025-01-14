@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
 from TIClustering import TIClustering
+import numpy as np
 
 
 # Function to compute Adjusted Rand Index (ARI)
@@ -59,14 +60,27 @@ def measure_execution_time(clustering_method, *args, **kwargs):
 
 # Example usage
 def main():
-    # Load Iris dataset
-    iris = load_iris()
-    data = iris.data
-    labels_true = iris.target
+    ################## 2d generated dataset ##################
+    # Generate a synthetic 2-feature dataset
+    np.random.seed(44)  # For reproducibility  #seed = [42, ]
+    n_samples = 150
+
+    # Create two clusters
+    cluster_1 = np.random.normal(loc=[2, 2], scale=0.5, size=(n_samples // 2, 2))
+    cluster_2 = np.random.normal(loc=[-2, -2], scale=0.5, size=(n_samples // 2, 2))
+
+    # Combine the clusters into one dataset
+    data = np.vstack([cluster_1, cluster_2])
+    labels_true = np.array([0] * (n_samples // 2) + [1] * (n_samples // 2))
 
     # Standardize the dataset
     scaler = StandardScaler()
     data = scaler.fit_transform(data)
+
+    # TIClustering
+    tic = TIClustering(threshold=1.4)  # threshold = [1.4, ]
+    exec_time_tic, _ = measure_execution_time(tic.fit, data)
+    clusters = tic.get_clusters()
 
     # K-Means clustering
     kmeans = KMeans(n_clusters=3, random_state=42)
@@ -78,16 +92,19 @@ def main():
     exec_time_dbscan, dbscan_model = measure_execution_time(dbscan.fit, data)
     labels_dbscan = dbscan_model.labels_
 
-    # TIClustering
-    tic = TIClustering(threshold=2.7)
-    exec_time_tic, _ = measure_execution_time(tic.fit, data)
-    clusters = tic.get_clusters()
+    print("Clusters:", clusters)
 
     # Create flat labels for TIClustering
     labels_tic = [-1] * len(data)
     for cluster_id, cluster in enumerate(clusters):
         for point in cluster:
             labels_tic[point] = cluster_id
+
+    # Create a DataFrame for cluster assignments
+    cluster_assignments = []
+    for i, cluster in enumerate(clusters):
+        for point in cluster:
+            cluster_assignments.append([point, i])
 
     # Metrics computation for K-Means
     ari_kmeans = compute_ari(labels_true, labels_kmeans)
@@ -117,12 +134,6 @@ def main():
     print(f"Silhouette Score: {silhouette_tic}")
     print(f"Execution Time: {exec_time_tic} seconds")
 
-    # Create a DataFrame for cluster assignments
-    cluster_assignments = []
-    for i, cluster in enumerate(clusters):
-        for point in cluster:
-            cluster_assignments.append([point, i])
-
     # Convert to DataFrame for easier analysis and display
     df = pd.DataFrame(cluster_assignments, columns=["Point Index", "Cluster ID"])
 
@@ -141,9 +152,9 @@ def main():
         )
 
     # Adding titles and labels
-    plt.title("Triangle Inequality Clustering of Iris Dataset")
-    plt.xlabel("Sepal Length")
-    plt.ylabel("Sepal Width")
+    plt.title("Triangle Inequality Clustering of Synthetic Dataset")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
     plt.legend()
 
     # Show the plot

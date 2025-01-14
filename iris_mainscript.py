@@ -1,8 +1,11 @@
 import time
+import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
+from TIClustering import TIClustering
 
 
 # Function to compute Adjusted Rand Index (ARI)
@@ -75,6 +78,17 @@ def main():
     exec_time_dbscan, dbscan_model = measure_execution_time(dbscan.fit, data)
     labels_dbscan = dbscan_model.labels_
 
+    # TIClustering
+    tic = TIClustering(threshold=3) #3.5
+    exec_time_tic, _ = measure_execution_time(tic.fit, data)
+    clusters = tic.get_clusters()
+
+    # Create flat labels for TIClustering
+    labels_tic = [-1] * len(data)
+    for cluster_id, cluster in enumerate(clusters):
+        for point in cluster:
+            labels_tic[point] = cluster_id
+
     # Metrics computation for K-Means
     ari_kmeans = compute_ari(labels_true, labels_kmeans)
     silhouette_kmeans = compute_silhouette(data, labels_kmeans)
@@ -82,6 +96,10 @@ def main():
     # Metrics computation for DBSCAN
     ari_dbscan = compute_ari(labels_true, labels_dbscan)
     silhouette_dbscan = compute_silhouette(data, labels_dbscan)
+
+    # Metrics computation for TIClustering
+    ari_tic = compute_ari(labels_true, labels_tic)
+    silhouette_tic = compute_silhouette(data, labels_tic)
 
     # Print results
     print("K-Means:")
@@ -93,6 +111,43 @@ def main():
     print(f"ARI: {ari_dbscan}")
     print(f"Silhouette Score: {silhouette_dbscan}")
     print(f"Execution Time: {exec_time_dbscan} seconds")
+
+    print("\nTIClustering:")
+    print(f"ARI: {ari_tic}")
+    print(f"Silhouette Score: {silhouette_tic}")
+    print(f"Execution Time: {exec_time_tic} seconds")
+
+    # Create a DataFrame for cluster assignments
+    cluster_assignments = []
+    for i, cluster in enumerate(clusters):
+        for point in cluster:
+            cluster_assignments.append([point, i])
+
+    # Convert to DataFrame for easier analysis and display
+    df = pd.DataFrame(cluster_assignments, columns=["Point Index", "Cluster ID"])
+
+    # Display the cluster assignments as a table
+    print("\nCluster Assignments Table:")
+    print(df)
+
+    # Plot the clusters using only the first two features (sepal length and sepal width)
+    plt.figure(figsize=(10, 6))
+
+    # Plot each cluster with different colors
+    for cluster_id, cluster in enumerate(clusters):
+        cluster_data = data[cluster]
+        plt.scatter(
+            cluster_data[:, 0], cluster_data[:, 1], label=f"Cluster {cluster_id}"
+        )
+
+    # Adding titles and labels
+    plt.title("Triangle Inequality Clustering of Iris Dataset")
+    plt.xlabel("Sepal Length")
+    plt.ylabel("Sepal Width")
+    plt.legend()
+
+    # Show the plot
+    plt.show()
 
 
 if __name__ == "__main__":
